@@ -1,0 +1,38 @@
+{
+    "name": "minutephp\/product",
+    "description": "Minutephp Plugin: product",
+    "keywords": [
+        "minutephp",
+        "product",
+        "php",
+        "angularjs",
+        "framework",
+        "plugin"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sanchit Bhatnagar",
+            "email": "dev@minutephp.com",
+            "homepage": "http:\/\/www.minutephp.com"
+        }
+    ],
+    "require": {
+        "php": ">=7",
+        "minutephp\/wallet": "^0"
+    },
+    "require-dev": {
+        "phpunit\/phpunit": "~4"
+    },
+    "bin": [
+        "bin\/create-products",
+        "bin\/create-coupons"
+    ],
+    "autoload": {
+        "psr-4": {
+            "App\\": "app\/",
+            "Minute\\": "minute\/",
+            "Test\\": "test\/"
+        }
+    }
+}

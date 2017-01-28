@@ -1,0 +1,80 @@
+#!/usr/bin/env php
+<?php
+
+//This script is a shortcut to create coupons for products
+
+namespace Bin {
+
+    use App\Model\MProduct;
+    use App\Model\MProductCoupon;
+    use Auryn\Injector;
+    use Carbon\Carbon;
+    use Minute\Database\Database;
+
+    set_time_limit(0);
+
+    require_once(realpath(__DIR__ . "/../../../autoload.php"));
+
+    Class CreateCoupons {
+        /**
+         * @var Database
+         */
+        private $database;
+
+        /**
+         * CreateProducts constructor.
+         *
+         * @param Database $database
+         */
+        public function __construct(Database $database) {
+            $this->database = $database;
+        }
+
+        public function run(array $args) {
+            $code     = $args[0] ?? 'half-off';
+            $discount = $args[1] ?? '50%'; //1
+            $period   = $args[2] ?? '1m'; //3d
+            $matching = $args[3] ?? '%month%'; //year
+
+            MProductCoupon::unguard();
+            $products = MProduct::where('name', 'like', $matching)->get();
+
+            foreach ($products as $product) {
+                echo "Creating coupons for ", $product->name, "\n";
+
+                if (strstr($discount, '%') !== false) {
+                    $percent = ((int) $discount / 100);
+                    $amount  = sprintf('%.02f', $product->rebill_amount * $percent);
+                    $comment = sprintf('%d%% discount for %s!', $discount, $this->periodAsStr($period));
+                } else {
+                    $amount  = sprintf('%.02f', $discount);
+                    $comment = sprintf('Only $%s for %s!', $amount, $this->periodAsStr($period));
+                }
+
+                try {
+                    MProductCoupon::create(['product_id' => $product->product_id, 'created_at' => Carbon::now(), 'code' => $code, 'setup_amount' => $amount, 'setup_time' => $period,
+                                            'expires_at' => '20200101', 'comment' => $comment]);
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
+        private function periodAsStr($period) {
+            if (preg_match('/(\d+)d/', $period, $matches)) {
+                return sprintf("first %d day%s", $matches[1], $matches[1] > 1 ? 's' : '');
+            } elseif (preg_match('/(\d+)m/', $period, $matches)) {
+                return sprintf("first %d month%s", $matches[1], $matches[1] > 1 ? 's' : '');
+            }
+
+            return '';
+        }
+    }
+
+    global $argv, $injector;
+
+    $injector  = new Injector();
+    $automator = $injector->make(CreateCoupons::class);
+    $automator->run(array_slice($argv, 1));
+    //create-coupons half-off 50% 1m %month% - creates a coupon with 50% discount on first month for all product names with "month" in their `name`
+    //create-coupons half-off 1 3d %year% - creates a coupon with $1 fixed on first three days for all product names with "year" in their `name`
+}

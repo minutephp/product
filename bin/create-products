@@ -1,0 +1,122 @@
+#!/usr/bin/env php
+<?php
+
+//This script is a shortcut to create actual products from the /pricing page
+
+namespace Bin {
+
+    use App\Model\MPage;
+    use App\Model\MPageContent;
+    use App\Model\MProduct;
+    use App\Model\MProductGroup;
+    use Auryn\Injector;
+    use Carbon\Carbon;
+    use Minute\Database\Database;
+
+    set_time_limit(0);
+
+    require_once(realpath(__DIR__ . "/../../../autoload.php"));
+
+    Class CreateProducts {
+        /**
+         * @var Database
+         */
+        private $database;
+
+        /**
+         * CreateProducts constructor.
+         *
+         * @param Database $database
+         */
+        public function __construct(Database $database) {
+            $this->database = $database;
+        }
+
+        public function run(array $args) {
+            $slug       = sprintf('/%s', ltrim($args[0] ?? 'pricing', '/'));
+            $group_name = $args[1] ?? null;
+
+            if ($page = MPage::where('slug', '=', $slug)->first()) {
+                /** @var MPageContent $content */
+                if ($content = MPageContent::where('page_id', '=', $page->page_id)->first()) {
+                    $data     = json_decode($content->data_json);
+                    $packages = $data->model->local->pricing->packages;
+
+                    foreach ($packages as $index => $package) {
+                        foreach (['setup', 'monthly', 'yearly'] as $type) {
+                            if ($price = $package->{"price_$type"}) {
+                                $name  = preg_replace('/\W+/', '', preg_replace('/\s*account$/i', '', strtolower($this->removeHtml($package->name))));
+                                $recur = $type == 'setup' ? 'one-time' : $type;
+                                $cname = sprintf("%s account (%s)", ucfirst($name), $recur);
+
+                                if ($product = MProduct::where('name', '=', $cname)->first()) {
+                                } elseif (preg_match('~/(\d+)/~', $package->{"link_$type"}, $matches)) {
+                                    $product = MProduct::find($matches[1]);
+                                }
+
+                                if (empty($product)) {
+                                    $product = new MProduct();
+
+                                    if (!empty($matches[1])) {
+                                        $product->product_id = $matches[1];
+                                    }
+
+                                    $product->name        = $cname;
+                                    $product->description = sprintf("%s account (billed %s)", ucfirst($name), $recur);
+                                    $product->created_at  = Carbon::now();
+                                }
+
+                                $product->updated_at    = Carbon::now();
+                                $product->rebill_amount = $price;
+                                $product->rebill_time   = $type == 'yearly' ? '1y' : '1m';
+                                $product->enabled       = true;
+
+                                if ($product->save()) {
+                                    if (empty($package->{"link_$type"})) {
+                                        $changed = true;;
+                                        $data->model->local->pricing->packages[$index]->{"link_$type"} = sprintf('/purchase/{processor}/%d', $product->product_id);
+                                    }
+
+                                    printf("Created product %10s (%d) for $%.02f..\n", $name, $product->product_id, $price);
+
+                                    if (!($groups = MProductGroup::where('product_id', '=', $product->product_id)->count())) {
+                                        printf("Creating an ad-hoc group for product: %s\n", $product->product_id);
+                                        MProductGroup::unguard();
+
+                                        foreach (array('processing', 'rebill') as $payment_type) {
+                                            $credits = preg_match('/(\d+) .*(per |\/)(month|year)/i', json_encode($package), $matches) ? $matches[1] : 10;
+                                            $credits = $credits > 0 ? $credits : 10;
+                                            $credits = $type == 'yearly' ? $credits * 12 : $credits;
+
+                                            MProductGroup::create(['product_id' => $product->product_id, 'payment_type' => $payment_type, 'group_name' => $group_name ?? $name,
+                                                                   'credits' => $payment_type == 'processing' ? 1 : $credits,
+                                                                   'extend_expiry_days' => $payment_type == 'processing' ? 1 : ($type == 'yearly' ? 366 : 31)]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!empty($changed)) {
+                        $content->data_json = json_encode($data);
+
+                        if ($content->save()) {
+                            printf("Page content updated!\n");
+                        }
+                    }
+                }
+            }
+        }
+
+        private function removeHtml($str) {
+            return strip_tags(preg_replace('/\s+/', ' ', preg_replace('~<\s*(.*?)\s*>.*?</\s*\1\s*>~', '', $str)));
+        }
+    }
+
+    global $argv, $injector;
+
+    $injector  = new Injector();
+    $automator = $injector->make(CreateProducts::class);
+    $automator->run(array_slice($argv, 1));
+}
