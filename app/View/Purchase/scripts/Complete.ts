@@ -1,4 +1,4 @@
-/// <reference path="E:/var/Dropbox/projects/minutephp/public/static/bower_components/minute/_all.d.ts" />
+/// <reference path="../../../../../../../public/static/bower_components/minute/_all.d.ts" />
 
 module App {
     export class CompleteController {

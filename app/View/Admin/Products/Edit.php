@@ -64,6 +64,13 @@
                         </div>
 
                         <div class="form-group">
+                            <label class="col-sm-2 control-label" for="welcome_url"><span translate="">Welcome URL:</span></label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="welcome_url" placeholder="Return URL on successful payment" ng-model="product.welcome_url" ng-required="false">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
                             <label class="col-sm-2 control-label"><span translate="">Access granted:</span></label>
                             <div class="col-sm-10">
                                 <div class="help-block">

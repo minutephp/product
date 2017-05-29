@@ -4,21 +4,22 @@
  * Date: 10/15/2016
  * Time: 5:23 AM
  */
+
 namespace Minute\Cart {
 
     use App\Model\MProduct;
     use App\Model\MProductCart;
     use Carbon\Carbon;
     use Minute\Config\Config;
+    use Minute\Event\CartEvent;
     use Minute\Event\Dispatcher;
+    use Minute\Event\WalletModifyEvent;
     use Minute\Event\WalletOrderEvent;
-    use Minute\Event\WalletOrderModifyEvent;
     use Minute\Event\WalletPurchaseEvent;
     use Minute\Http\HttpResponseEx;
     use Minute\Lang\Lang;
     use Minute\Log\LoggerEx;
     use Minute\Session\Session;
-    use Minute\View\Redirection;
 
     class Cart {
         /**
@@ -76,17 +77,17 @@ namespace Minute\Cart {
                 /** @var MProductCart $cart */
                 $cart    = MProductCart::find($cart_id);
                 $product = MProduct::find($cart->product_id);
-                $url     = $product->welcome_url ?: $this->config->get('private/urls/welcome_url', '/purchase/complete');
+                $url     = $product->welcome_url ?: ($this->config->get('private/urls/welcome_url', '/purchase/complete'));
 
                 if (!$cart->user_id) {
                     if ($user_id = $this->session->getLoggedInUserId()) {
                         $cart->user_id = $user_id;
                         $cart->save();
 
-                        $event = new WalletOrderModifyEvent('cart', $cart_id, ['user_id' => $user_id]);
-                        $this->dispatcher->fire(WalletOrderModifyEvent::USER_WALLET_ORDER_MODIFY, $event);
+                        $modifyEvent = new WalletModifyEvent('cart', $cart_id, ['user_id' => $user_id]);
+                        $this->dispatcher->fire(WalletModifyEvent::USER_WALLET_MODIFY, $modifyEvent);
                     } else {
-                        $url = $this->response->getLoginRedirect($this->lang->getText('Please login or signup to complete your purchase'));
+                        $url = $this->response->getLoginRedirect($this->lang->getText('This step is required to complete your purchase!'), false, '/auth/purchase');
                     }
                 }
 
@@ -101,6 +102,8 @@ namespace Minute\Cart {
                 if ($cart = MProductCart::find($cart_id)) {
                     $cart->status = 'cancel';
                     $cart->save();
+
+                    $this->dispatcher->fire(CartEvent::USER_CART_CANCELED, new CartEvent($cart->user_id, $cart->toArray()));
                 }
             }
         }
@@ -145,7 +148,9 @@ namespace Minute\Cart {
                 }
 
                 $cart->save();
+
                 $this->cartManager->upgrade($type, $cart);
+                $this->dispatcher->fire(CartEvent::USER_CART_PURCHASED, new CartEvent($cart->user_id, $cart->toArray()));
             }
         }
 
@@ -175,6 +180,7 @@ namespace Minute\Cart {
                     $cart->save();
 
                     $this->cartManager->downgrade($type, $cart);
+                    $this->dispatcher->fire(CartEvent::USER_CART_REFUNDED, new CartEvent($cart->user_id, $cart->toArray()));
                 }
             }
         }

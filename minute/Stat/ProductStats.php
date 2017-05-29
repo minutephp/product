@@ -8,7 +8,6 @@ namespace Minute\Stat {
 
     use App\Model\MProductCart;
     use App\Model\MProductStat;
-    use Minute\Event\UserPaymentEvent;
     use Minute\Event\WalletOrderEvent;
 
     class ProductStats {

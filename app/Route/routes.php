@@ -20,6 +20,7 @@ $router->get('/purchase/{processor}/{product_id}', 'Purchase', false, 'm_product
        ->setReadPermission('product', Permission::EVERYONE);
 
 $router->get('/purchase/complete', null, false);
+$router->get('/auth/purchase', null, false);
 
 //voucher
 $router->get('/_payments/vouchers/load', 'Payment/Vouchers.php@load', false)
