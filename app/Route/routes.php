@@ -17,7 +17,7 @@ $router->post('/admin/products/edit/{product_id}', null, 'admin', 'm_products as
        ->setAllPermissions('products', 'admin')->setAllPermissions('levels', 'admin')->setAllPermissions('coupons', 'admin')->setDefault('product_id', '0');
 
 $router->get('/purchase/{processor}/{product_id}', 'Purchase', false, 'm_products[product_id] as product')
-       ->setReadPermission('product', Permission::EVERYONE);
+       ->setReadPermission('product', Permission::EVERYONE)->setDefault('_noView', true);;
 
 $router->get('/purchase/complete', null, false);
 $router->get('/auth/purchase', null, false);
