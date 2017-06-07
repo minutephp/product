@@ -22,7 +22,7 @@ namespace Minute\Cart {
                     /** @var MUserGroup $group */
                     $group   = MUserGroup::firstOrNew(['user_id' => $user_id, 'product_cart_id' => $cart->product_cart_id, 'group_name' => $level->group_name]);
                     $expires = Carbon::parse($group->expires_at) ?: $now;
-                    $expires = $expires > $now ? $expires : $now;
+                    $expires = $expires > $now ? $expires : Carbon::now();
 
                     $group->created_at = $group->created_at ?: $now;
                     $group->updated_at = $now;
